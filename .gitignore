@@ -196,6 +196,13 @@ cython_debug/
 #   Learn more at https://abstra.io/docs
 .abstra/
 
+# Expo
+.expo/
+web-build/
+dist/
+node_modules/
+expo-env.d.ts
+
 # Visual Studio Code
 #   Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore that
 #   can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore

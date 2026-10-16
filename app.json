@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Dual Snake",
+    "slug": "dual-snake",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dualsnake.game"
+    },
+    "android": {
+      "package": "com.dualsnake.game",
+      "adaptiveIcon": {
+        "backgroundColor": "#101810"
+      }
+    }
+  }
+}
