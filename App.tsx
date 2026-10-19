@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { setAudioModeAsync, useAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -13,8 +16,10 @@ import {
   changeDirection,
   createGame,
   Direction,
+  GameSpeed,
   GAME_COLUMNS,
   GAME_ROWS,
+  getTickInterval,
   reverseEnds,
   tickGame,
 } from './src/game';
@@ -40,15 +45,137 @@ const DIRECTIONS: { direction: Direction; label: string; symbol: string }[] = [
   { direction: 'right', label: 'Right', symbol: '▶' },
 ];
 
+const BEST_SCORE_KEY = '@dual-snake/best-score';
+const SOUND_ENABLED_KEY = '@dual-snake/sound-enabled';
+const GAME_SPEED_KEY = '@dual-snake/game-speed';
+const SPEED_OPTIONS: { speed: GameSpeed; label: string }[] = [
+  { speed: 'slow', label: 'SLOW' },
+  { speed: 'normal', label: 'NORMAL' },
+  { speed: 'fast', label: 'FAST' },
+];
+
 export default function App() {
   const { width } = useWindowDimensions();
   const [game, setGame] = useState(createGame);
   const [bestScore, setBestScore] = useState(0);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [gameSpeed, setGameSpeed] = useState<GameSpeed>('normal');
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const boardWidth = Math.min(width - 40, 390);
   const cellWidth = boardWidth / GAME_COLUMNS;
   const boardHeight = cellWidth * GAME_ROWS;
-  const score = (game.snake.length - 5) * 10;
+  const score = game.score;
   const directionSymbols = { up: '▲', down: '▼', left: '◀', right: '▶' };
+  const startSound = useAudioPlayer(require('./assets/audio/start.wav'));
+  const eatSound = useAudioPlayer(require('./assets/audio/eat.wav'));
+  const reverseSound = useAudioPlayer(require('./assets/audio/reverse.wav'));
+  const gameOverSound = useAudioPlayer(require('./assets/audio/game-over.wav'));
+  const storageErrorShown = useRef(false);
+  const audioErrorShown = useRef(false);
+  const previousSoundState = useRef({ status: game.status, score, activeEnd: game.activeEnd });
+
+  const reportStorageError = useCallback(() => {
+    if (storageErrorShown.current) return;
+    storageErrorShown.current = true;
+    Alert.alert(
+      'Could not save preferences',
+      'Device storage is unavailable. Your best score or sound setting may not be saved.',
+    );
+  }, []);
+
+  const reportAudioError = useCallback(() => {
+    if (audioErrorShown.current) return;
+    audioErrorShown.current = true;
+    Alert.alert('Sound unavailable', 'The game will continue without sound.');
+  }, []);
+
+  const playSound = useCallback(
+    async (player: AudioPlayer) => {
+      if (!soundEnabled) return;
+      try {
+        await player.seekTo(0);
+        player.play();
+      } catch {
+        reportAudioError();
+      }
+    },
+    [reportAudioError, soundEnabled],
+  );
+
+  useEffect(() => {
+    let active = true;
+    AsyncStorage.multiGet([BEST_SCORE_KEY, SOUND_ENABLED_KEY, GAME_SPEED_KEY])
+      .then((entries) => {
+        if (!active) return;
+        const savedBest = entries.find(([key]) => key === BEST_SCORE_KEY)?.[1];
+        const parsedBest = savedBest === null || savedBest === undefined ? 0 : Number(savedBest);
+        if (Number.isFinite(parsedBest) && parsedBest >= 0) {
+          setBestScore((best) => Math.max(best, parsedBest));
+        }
+        const savedSound = entries.find(([key]) => key === SOUND_ENABLED_KEY)?.[1];
+        if (savedSound !== null && savedSound !== undefined) {
+          setSoundEnabled(savedSound === 'true');
+        }
+        const savedSpeed = entries.find(([key]) => key === GAME_SPEED_KEY)?.[1];
+        if (savedSpeed === 'slow' || savedSpeed === 'normal' || savedSpeed === 'fast') {
+          setGameSpeed(savedSpeed);
+        }
+        setPreferencesLoaded(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setPreferencesLoaded(true);
+        reportStorageError();
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [reportStorageError]);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    AsyncStorage.setItem(BEST_SCORE_KEY, String(bestScore)).catch(reportStorageError);
+  }, [bestScore, preferencesLoaded, reportStorageError]);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    AsyncStorage.setItem(SOUND_ENABLED_KEY, String(soundEnabled)).catch(reportStorageError);
+  }, [preferencesLoaded, reportStorageError, soundEnabled]);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    AsyncStorage.setItem(GAME_SPEED_KEY, gameSpeed).catch(reportStorageError);
+  }, [gameSpeed, preferencesLoaded, reportStorageError]);
+
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: false,
+      interruptionMode: 'mixWithOthers',
+    }).catch(reportAudioError);
+  }, [reportAudioError]);
+
+  useEffect(() => {
+    const previous = previousSoundState.current;
+    if (game.status === 'playing' && previous.status !== 'playing') {
+      void playSound(startSound);
+    } else if (previous.status === 'playing' && game.status === 'over') {
+      void playSound(gameOverSound);
+    } else if (game.status === 'playing') {
+      if (score > previous.score) void playSound(eatSound);
+      if (game.activeEnd !== previous.activeEnd) void playSound(reverseSound);
+    }
+    previousSoundState.current = { status: game.status, score, activeEnd: game.activeEnd };
+  }, [
+    eatSound,
+    game.activeEnd,
+    game.status,
+    gameOverSound,
+    playSound,
+    reverseSound,
+    score,
+    startSound,
+  ]);
 
   useEffect(() => {
     setBestScore((best) => Math.max(best, score));
@@ -58,11 +185,11 @@ export default function App() {
     if (game.status !== 'playing') return undefined;
 
     const timer = setInterval(() => {
-      setGame((current) => tickGame(current));
-    }, Math.max(80, 170 - Math.floor(score / 50) * 10));
+      setGame((current) => tickGame(current, getTickInterval(gameSpeed, current.score)));
+    }, getTickInterval(gameSpeed, score));
 
     return () => clearInterval(timer);
-  }, [game.status, score]);
+  }, [game.status, gameSpeed, score]);
 
   function startGame() {
     setGame((current) => ({ ...current, status: 'playing' }));
@@ -116,6 +243,12 @@ export default function App() {
             <Text style={styles.cardLabel}>LEVEL</Text>
             <Text style={styles.scoreValue}>{String(1 + Math.floor(score / 50)).padStart(2, '0')}</Text>
           </View>
+          <View style={styles.scoreCard}>
+            <Text style={styles.cardLabel}>BONUS</Text>
+            <Text style={styles.scoreValue}>
+              {game.bonusFood ? `${Math.ceil(game.bonusFood.timeLeftMs / 1000)}s` : '--'}
+            </Text>
+          </View>
         </View>
 
         <View
@@ -147,6 +280,23 @@ export default function App() {
               },
             ]}
           />
+          {game.bonusFood && (
+            <View
+              accessibilityLabel={`Bonus food, ${Math.ceil(game.bonusFood.timeLeftMs / 1000)} seconds remaining`}
+              style={[
+                styles.bonusFood,
+                {
+                  left: game.bonusFood.position.x * cellWidth + cellWidth * 0.04,
+                  top: game.bonusFood.position.y * cellWidth + cellWidth * 0.04,
+                  width: cellWidth * 0.92,
+                  height: cellWidth * 0.92,
+                  borderRadius: cellWidth * 0.46,
+                },
+              ]}
+            >
+              <Text style={[styles.bonusFoodSymbol, { fontSize: cellWidth * 0.75 }]}>★</Text>
+            </View>
+          )}
           {game.snake.map((segment, index) => {
             const isActiveHead =
               game.activeEnd === 'start'
@@ -190,7 +340,47 @@ export default function App() {
 
         <View style={styles.controlsHeader}>
           <Text style={styles.sectionTitle}>CONTROLS</Text>
-          <Text style={styles.controlHint}>Pick a direction for your active head</Text>
+          <View style={styles.controlActions}>
+            <Text style={styles.controlHint}>Pick a direction</Text>
+            <Pressable
+              accessibilityRole="switch"
+              accessibilityLabel="Game sound"
+              accessibilityState={{ checked: soundEnabled, disabled: !preferencesLoaded }}
+              disabled={!preferencesLoaded}
+              onPress={() => setSoundEnabled((enabled) => !enabled)}
+              style={({ pressed }) => [
+                styles.soundButton,
+                !soundEnabled && styles.soundButtonMuted,
+                pressed && styles.buttonPressed,
+              ]}
+            >
+              <Text style={styles.soundButtonText}>{soundEnabled ? '♫ ON' : '♫ OFF'}</Text>
+            </Pressable>
+          </View>
+        </View>
+        <View accessibilityRole="radiogroup" accessibilityLabel="Game speed" style={styles.speedSelector}>
+          {SPEED_OPTIONS.map(({ speed, label }) => {
+            const selected = gameSpeed === speed;
+            return (
+              <Pressable
+                key={speed}
+                accessibilityRole="radio"
+                accessibilityLabel={`${label.toLowerCase()} snake speed`}
+                accessibilityState={{ checked: selected, disabled: !preferencesLoaded }}
+                disabled={!preferencesLoaded}
+                onPress={() => setGameSpeed(speed)}
+                style={({ pressed }) => [
+                  styles.speedOption,
+                  selected && styles.speedOptionSelected,
+                  pressed && styles.buttonPressed,
+                ]}
+              >
+                <Text style={[styles.speedOptionText, selected && styles.speedOptionTextSelected]}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
         <View style={styles.controlsRow}>
           <View style={styles.dpad}>
@@ -375,6 +565,20 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     transform: [{ rotate: '45deg' }],
   },
+  bonusFood: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0d477',
+    borderColor: '#744b20',
+    borderWidth: 1,
+  },
+  bonusFoodSymbol: {
+    color: '#744b20',
+    lineHeight: 22,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
   snakeSegment: {
     position: 'absolute',
     backgroundColor: COLORS.snake,
@@ -430,6 +634,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
+  controlActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   sectionTitle: {
     color: '#dce4ce',
     fontSize: 11,
@@ -439,6 +648,54 @@ const styles = StyleSheet.create({
   controlHint: {
     color: COLORS.muted,
     fontSize: 10,
+  },
+  speedSelector: {
+    width: '100%',
+    maxWidth: 430,
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 9,
+  },
+  speedOption: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: '#354536',
+    backgroundColor: COLORS.panel,
+    paddingVertical: 7,
+  },
+  speedOptionSelected: {
+    borderColor: '#8fa968',
+    backgroundColor: '#2b3c2a',
+  },
+  speedOptionText: {
+    color: COLORS.muted,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  speedOptionTextSelected: {
+    color: COLORS.accent,
+  },
+  soundButton: {
+    minWidth: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 7,
+    backgroundColor: COLORS.button,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  soundButtonMuted: {
+    opacity: 0.65,
+  },
+  soundButtonText: {
+    color: COLORS.accent,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.7,
   },
   controlsRow: {
     width: '100%',

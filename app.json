@@ -3,17 +3,41 @@
     "name": "Dual Snake",
     "slug": "dual-snake",
     "version": "1.0.0",
+    "scheme": "dualsnake",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dualsnake.game"
+      "bundleIdentifier": "com.dualsnake.game",
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.dualsnake.game",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#101810"
+        "backgroundColor": "#101810",
+        "foregroundImage": "./assets/adaptive-icon.png"
       }
-    }
+    },
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#101810",
+          "image": "./assets/icon.png",
+          "imageWidth": 180
+        }
+      ]
+    ]
   }
 }
