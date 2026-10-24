@@ -3,6 +3,7 @@ import { setAudioModeAsync, useAudioPlayer, type AudioPlayer } from 'expo-audio'
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -48,6 +49,7 @@ const DIRECTIONS: { direction: Direction; label: string; symbol: string }[] = [
 const BEST_SCORE_KEY = '@dual-snake/best-score';
 const SOUND_ENABLED_KEY = '@dual-snake/sound-enabled';
 const GAME_SPEED_KEY = '@dual-snake/game-speed';
+const PRIVACY_POLICY_URL = 'https://dangerrockstar.github.io/dual-snake/privacy-policy.html';
 const SPEED_OPTIONS: { speed: GameSpeed; label: string }[] = [
   { speed: 'slow', label: 'SLOW' },
   { speed: 'normal', label: 'NORMAL' },
@@ -201,6 +203,12 @@ export default function App() {
 
   function handleDirection(direction: Direction) {
     setGame((current) => changeDirection(current, direction));
+  }
+
+  function openPrivacyPolicy() {
+    void Linking.openURL(PRIVACY_POLICY_URL).catch(() => {
+      Alert.alert('Could not open privacy policy', 'Please try again when you have an internet connection.');
+    });
   }
 
   const overlayTitle = game.status === 'over' ? 'GAME OVER' : game.status === 'won' ? 'YOU WIN!' : 'READY?';
@@ -421,6 +429,13 @@ export default function App() {
           </Text>
         </View>
         <Text style={styles.footer}>INSPIRED BY THE CLASSIC. MADE FOR YOUR PHONE.</Text>
+        <Pressable
+          accessibilityRole="link"
+          onPress={openPrivacyPolicy}
+          style={({ pressed }) => pressed && styles.privacyLinkPressed}
+        >
+          <Text style={styles.privacyLink}>Privacy Policy</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -805,6 +820,16 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
     paddingTop: 10,
     textAlign: 'center',
+  },
+  privacyLink: {
+    color: COLORS.accent,
+    fontSize: 12,
+    fontWeight: '700',
+    paddingVertical: 10,
+    textDecorationLine: 'underline',
+  },
+  privacyLinkPressed: {
+    opacity: 0.72,
   },
   buttonPressed: {
     opacity: 0.72,

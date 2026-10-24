@@ -1,6 +1,6 @@
 # Dual Snake
 
-A retro, Nokia-inspired snake game for iOS and Android, built with Expo SDK 57 and React Native. The game is offline and has no ads, analytics, accounts, or networked gameplay. Best score and sound preference are stored locally on the device.
+A retro, Nokia-inspired snake game for iOS and Android, built with Expo SDK 57 and React Native. Gameplay is offline, with no ads, analytics, accounts, or networked gameplay. Best score, sound choice, and game speed are stored locally on the device.
 
 ## Play
 
@@ -80,6 +80,10 @@ For a test build before production, run `npm run build:preview`. Android receive
    EAS Submit needs a Google Play service-account key configured through EAS credentials. You can also download the `.aab` and upload it in Play Console.
 3. Complete the store listing, screenshots, content rating, Data safety form, privacy details, and any testing requirements shown in Play Console. Test the release, then promote it to production and submit it for review.
 
-Prepare original store screenshots and listing copy for both stores. Report data collection accurately: this game currently has no account, advertising, analytics, or network features, and saves its best score and sound setting locally. Revisit the privacy disclosures if you add services or collect data later.
+Prepare original store screenshots and listing copy for both stores. Report data collection accurately: this game currently has no account, advertising, analytics, or networked gameplay, and saves its best score, sound choice, and speed locally. Revisit the privacy disclosures if you add services or collect data later.
 
 Store approval and publication are controlled by Apple and Google. You will need your own store accounts, app records, and signing credentials to complete those steps.
+
+## Privacy policy
+
+The policy is available as [privacy-policy.html](./privacy-policy.html), and the PDF copy is for your records. To publish the webpage, open this repository's **Settings > Pages**, choose **Deploy from a branch**, select the default branch and the `/(root)` folder, then save. After GitHub Pages finishes deploying, verify that `https://dangerrockstar.github.io/dual-snake/privacy-policy.html` loads publicly over HTTPS. Use that webpage URL in the Play Store listing; a Google Drive PDF link does not meet Google Play's webpage requirement. The in-app **Privacy Policy** link opens the same URL.

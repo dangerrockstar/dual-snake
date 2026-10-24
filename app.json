@@ -18,7 +18,10 @@
       "adaptiveIcon": {
         "backgroundColor": "#101810",
         "foregroundImage": "./assets/adaptive-icon.png"
-      }
+      },
+      "permissions": [
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "plugins": [
       [
@@ -38,6 +41,11 @@
           "imageWidth": 180
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "0ff51b9f-351b-4812-b01e-b40ff54e3f38"
+      }
+    }
   }
 }
